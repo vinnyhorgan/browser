@@ -1,4 +1,4 @@
-local http = require("socket.http")
+local https = require("https")
 local inspect = require("libs.inspect")
 local Object = require("libs.classic")
 local Camera = require("libs.camera")
@@ -12,7 +12,7 @@ local openSansH4 = love.graphics.newFont("assets/OpenSans-Bold.ttf", 22)
 local openSansH5 = love.graphics.newFont("assets/OpenSans-Bold.ttf", 18)
 local openSansH6 = love.graphics.newFont("assets/OpenSans-Bold.ttf", 14)
 
-local url = "http://motherfuckingwebsite.com"
+local url = "https://wikipedia.org"
 
 local dom = {}
 local y = 0
@@ -21,7 +21,7 @@ local error = false
 local errorCode = 0
 
 function loadPage(url)
-    local data, code = http.request(url)
+    local code, data, headers = https.request(url)
 
     if code == 200 then
         dom = htmlparser.parse(data)
@@ -91,6 +91,11 @@ function render(element)
         love.graphics.setColor(0, 0, 0)
 
         y = y + 20
+    elseif element.name == "img" then
+        local code, data = https.request(url .. "/" .. element.attributes.src)
+        local file = love.filesystem.newFile("image.png", "w")
+        file:write(data)
+        file:close()
     end
 
     for _, child in ipairs(element.nodes) do
