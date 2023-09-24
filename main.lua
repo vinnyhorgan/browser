@@ -12,7 +12,7 @@ local openSansH4 = love.graphics.newFont("assets/OpenSans-Bold.ttf", 22)
 local openSansH5 = love.graphics.newFont("assets/OpenSans-Bold.ttf", 18)
 local openSansH6 = love.graphics.newFont("assets/OpenSans-Bold.ttf", 14)
 
-local url = "https://wikipedia.org"
+local currenturl = ""
 
 local dom = {}
 local y = 0
@@ -20,16 +20,37 @@ local y = 0
 local error = false
 local errorCode = 0
 
+local images = {}
+
+function checkCollision(x1, y1, w1, h1, x2, y2, w2, h2)
+    return x1 < x2 + w2 and
+           x2 < x1 + w1 and
+           y1 < y2 + h2 and
+           y2 < y1 + h1
+end
+
 function loadPage(url)
     local code, data, headers = https.request(url)
 
     if code == 200 then
-        dom = htmlparser.parse(data)
-        love.window.setTitle(dom:select("title")[1]:getcontent())
+        dom = htmlparser.parse(data, 4000)
+
+        if dom:select("title")[1] then
+            love.window.setTitle(dom:select("title")[1]:getcontent())
+        end
+
+        currenturl = url
     else
         error = true
         errorCode = code
     end
+end
+
+function calculateWrappedWidth(text, font)
+    local wrappedText = love.graphics.newText(font, text)
+    wrappedText:setf(text, love.graphics.getWidth(), "left")
+
+    return wrappedText:getWidth()
 end
 
 function calculateWrappedHeight(text, font)
@@ -85,17 +106,61 @@ function render(element)
 
         y = y + 20
     elseif element.name == "a" then
-        love.graphics.setFont(openSans)
-        love.graphics.setColor(0, 0, 255)
-        love.graphics.printf(element:getcontent(), 0, y, love.graphics.getWidth())
-        love.graphics.setColor(0, 0, 0)
+        mousex, mousey = camera:mousePosition()
 
-        y = y + 20
+        if checkCollision(mousex, mousey, 1, 1, 0, y, calculateWrappedWidth(element:getcontent(), openSans), calculateWrappedHeight(element:getcontent(), openSans)) then
+            love.graphics.setFont(openSans)
+            love.graphics.setColor(0, 255, 255)
+            love.graphics.printf(element:getcontent(), 0, y, love.graphics.getWidth())
+            love.graphics.setColor(0, 0, 0)
+
+            if love.mouse.isDown(1) then
+                print("Going to: " .. element.attributes.href)
+                loadPage(element.attributes.href)
+            end
+        else
+            love.graphics.setFont(openSans)
+            love.graphics.setColor(0, 0, 255)
+            love.graphics.printf(element:getcontent(), 0, y, love.graphics.getWidth())
+            love.graphics.setColor(0, 0, 0)
+        end
+
+        y = y + calculateWrappedHeight(element:getcontent(), openSans) + 20
     elseif element.name == "img" then
-        local code, data = https.request(url .. "/" .. element.attributes.src)
-        local file = love.filesystem.newFile("image.png", "w")
-        file:write(data)
-        file:close()
+        if not images[element.attributes.src] and images[element.attributes.src] ~= "failed" then
+            local imageurl = ""
+
+            if string.sub(element.attributes.src, 1, 2) == "//" then
+                imageurl = "https:" .. element.attributes.src
+            else
+                imageurl = currenturl .. "/" .. element.attributes.src
+            end
+
+            local code
+            local data
+
+            if string.sub(imageurl, -3) == "gif" then
+                code = "Format not supported"
+            else
+                code, data = https.request(imageurl)
+            end
+
+            if code == 200 then
+                images[element.attributes.src] = love.graphics.newImage(love.data.newByteData(data))
+                print("Cached image: " .. imageurl)
+            else
+                images[element.attributes.src] = "failed"
+                print("Error loading image: " .. imageurl .. " error: " .. code)
+            end
+        end
+
+        if images[element.attributes.src] ~= nil and images[element.attributes.src] ~= "failed" then
+            love.graphics.setColor(1, 1, 1)
+            love.graphics.draw(images[element.attributes.src], 0, y)
+            love.graphics.setColor(0, 0, 0)
+
+            y = y + images[element.attributes.src]:getHeight() + 20
+        end
     end
 
     for _, child in ipairs(element.nodes) do
@@ -106,7 +171,7 @@ end
 function love.load()
     camera = Camera(love.graphics.getWidth() / 2, love.graphics.getHeight() / 2)
 
-    loadPage(url)
+    loadPage("http://www.toad.com")
 end
 
 function love.update(dt)
