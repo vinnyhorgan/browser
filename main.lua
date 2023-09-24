@@ -12,6 +12,7 @@ local openSansH4 = love.graphics.newFont("assets/OpenSans-Bold.ttf", 22)
 local openSansH5 = love.graphics.newFont("assets/OpenSans-Bold.ttf", 18)
 local openSansH6 = love.graphics.newFont("assets/OpenSans-Bold.ttf", 14)
 
+-- globals
 local currenturl = ""
 
 local dom = {}
@@ -22,11 +23,39 @@ local errorCode = 0
 
 local images = {}
 
+local camera = Camera(love.graphics.getWidth() / 2, love.graphics.getHeight() / 2)
+
 function checkCollision(x1, y1, w1, h1, x2, y2, w2, h2)
     return x1 < x2 + w2 and
            x2 < x1 + w1 and
            y1 < y2 + h2 and
            y2 < y1 + h1
+end
+
+function calculateWrappedWidth(text, font)
+    local wrappedText = love.graphics.newText(font, text)
+    wrappedText:setf(text, love.graphics.getWidth(), "left")
+
+    return wrappedText:getWidth()
+end
+
+function calculateWrappedHeight(text, font)
+    local wrappedText = love.graphics.newText(font, text)
+    wrappedText:setf(text, love.graphics.getWidth(), "left")
+
+    return wrappedText:getHeight()
+end
+
+function parseurl(partialurl)
+    local parsed = ""
+
+    if string.sub(partialurl, 1, 2) == "//" then
+        parsed = "https:" .. partialurl
+    else
+        parsed = currenturl .. "/" .. partialurl
+    end
+
+    return parsed
 end
 
 function loadPage(url)
@@ -46,61 +75,49 @@ function loadPage(url)
     end
 end
 
-function calculateWrappedWidth(text, font)
-    local wrappedText = love.graphics.newText(font, text)
-    wrappedText:setf(text, love.graphics.getWidth(), "left")
-
-    return wrappedText:getWidth()
-end
-
-function calculateWrappedHeight(text, font)
-    local wrappedText = love.graphics.newText(font, text)
-    wrappedText:setf(text, love.graphics.getWidth(), "left")
-
-    return wrappedText:getHeight()
-end
-
 function render(element)
+    local content = element:getcontent():gsub("<[^>]+>", "")
+
     if element.name == "h1" then
         love.graphics.setFont(openSansH1)
-        love.graphics.printf(element:getcontent(), 0, y, love.graphics.getWidth())
+        love.graphics.printf(content, 0, y, love.graphics.getWidth())
 
-        y = y + calculateWrappedHeight(element:getcontent(), openSansH1) + 20
+        y = y + calculateWrappedHeight(content, openSansH1) + 20
     elseif element.name == "h2" then
         love.graphics.setFont(openSansH2)
-        love.graphics.printf(element:getcontent(), 0, y, love.graphics.getWidth())
+        love.graphics.printf(content, 0, y, love.graphics.getWidth())
 
-        y = y + calculateWrappedHeight(element:getcontent(), openSansH2) + 20
+        y = y + calculateWrappedHeight(content, openSansH2) + 20
     elseif element.name == "h3" then
         love.graphics.setFont(openSansH3)
-        love.graphics.printf(element:getcontent(), 0, y, love.graphics.getWidth())
+        love.graphics.printf(content, 0, y, love.graphics.getWidth())
 
-        y = y + calculateWrappedHeight(element:getcontent(), openSansH3) + 20
+        y = y + calculateWrappedHeight(content, openSansH3) + 20
     elseif element.name == "h4" then
         love.graphics.setFont(openSansH4)
-        love.graphics.printf(element:getcontent(), 0, y, love.graphics.getWidth())
+        love.graphics.printf(content, 0, y, love.graphics.getWidth())
 
-        y = y + calculateWrappedHeight(element:getcontent(), openSansH4) + 20
+        y = y + calculateWrappedHeight(content, openSansH4) + 20
     elseif element.name == "h5" then
         love.graphics.setFont(openSansH5)
-        love.graphics.printf(element:getcontent(), 0, y, love.graphics.getWidth())
+        love.graphics.printf(content, 0, y, love.graphics.getWidth())
 
-        y = y + calculateWrappedHeight(element:getcontent(), openSansH5) + 20
+        y = y + calculateWrappedHeight(content, openSansH5) + 20
     elseif element.name == "h6" then
         love.graphics.setFont(openSansH6)
-        love.graphics.printf(element:getcontent(), 0, y, love.graphics.getWidth())
+        love.graphics.printf(content, 0, y, love.graphics.getWidth())
 
-        y = y + calculateWrappedHeight(element:getcontent(), openSansH6) + 20
+        y = y + calculateWrappedHeight(content, openSansH6) + 20
     elseif element.name == "p" or element.name == "aside" then
         love.graphics.setFont(openSans)
-        love.graphics.printf(element:getcontent(), 0, y, love.graphics.getWidth())
+        love.graphics.printf(content, 0, y, love.graphics.getWidth())
 
-        y = y + calculateWrappedHeight(element:getcontent(), openSans) + 20
+        y = y + calculateWrappedHeight(content, openSans) + 20
     elseif element.name == "li" then
         love.graphics.setFont(openSans)
-        love.graphics.printf("    - " .. element:getcontent(), 0, y, love.graphics.getWidth())
+        love.graphics.printf("    - " .. content, 0, y, love.graphics.getWidth())
 
-        y = y + calculateWrappedHeight(element:getcontent(), openSans) + 20
+        y = y + calculateWrappedHeight(content, openSans) + 20
     elseif element.name == "hr" then
         love.graphics.line(10, y, love.graphics.getWidth() - 10, y)
 
@@ -108,33 +125,27 @@ function render(element)
     elseif element.name == "a" then
         mousex, mousey = camera:mousePosition()
 
-        if checkCollision(mousex, mousey, 1, 1, 0, y, calculateWrappedWidth(element:getcontent(), openSans), calculateWrappedHeight(element:getcontent(), openSans)) then
+        if checkCollision(mousex, mousey, 1, 1, 0, y, calculateWrappedWidth(content, openSans), calculateWrappedHeight(content, openSans)) then
             love.graphics.setFont(openSans)
             love.graphics.setColor(0, 255, 255)
-            love.graphics.printf(element:getcontent(), 0, y, love.graphics.getWidth())
+            love.graphics.printf(content, 0, y, love.graphics.getWidth())
             love.graphics.setColor(0, 0, 0)
 
             if love.mouse.isDown(1) then
-                print("Going to: " .. element.attributes.href)
-                loadPage(element.attributes.href)
+                print("Going to: " .. parseurl(element.attributes.href))
+                loadPage(parseurl(element.attributes.href))
             end
         else
             love.graphics.setFont(openSans)
             love.graphics.setColor(0, 0, 255)
-            love.graphics.printf(element:getcontent(), 0, y, love.graphics.getWidth())
+            love.graphics.printf(content, 0, y, love.graphics.getWidth())
             love.graphics.setColor(0, 0, 0)
         end
 
-        y = y + calculateWrappedHeight(element:getcontent(), openSans) + 20
+        y = y + calculateWrappedHeight(content, openSans) + 20
     elseif element.name == "img" then
         if not images[element.attributes.src] and images[element.attributes.src] ~= "failed" then
-            local imageurl = ""
-
-            if string.sub(element.attributes.src, 1, 2) == "//" then
-                imageurl = "https:" .. element.attributes.src
-            else
-                imageurl = currenturl .. "/" .. element.attributes.src
-            end
+            local imageurl = parseurl(element.attributes.src)
 
             local code
             local data
@@ -169,9 +180,7 @@ function render(element)
 end
 
 function love.load()
-    camera = Camera(love.graphics.getWidth() / 2, love.graphics.getHeight() / 2)
-
-    loadPage("http://www.toad.com")
+    loadPage("https://wikipedia.org")
 end
 
 function love.update(dt)
@@ -181,7 +190,7 @@ end
 function love.draw()
     camera:attach()
 
-    love.graphics.setBackgroundColor(255, 255, 255)
+    love.graphics.setBackgroundColor(1, 1, 1)
     love.graphics.setColor(0, 0, 0)
 
     y = 0
@@ -194,6 +203,8 @@ function love.draw()
     end
 
     camera:detach()
+
+    love.graphics.print("FPS: " .. love.timer.getFPS())
 end
 
 function love.resize(w, h)
@@ -201,5 +212,9 @@ function love.resize(w, h)
 end
 
 function love.wheelmoved(x, y)
-    camera:move(0, y * -30)
+    if love.keyboard.isDown("lctrl") then
+        camera.scale = camera.scale + y / 2
+    else
+        camera:move(0, y * -30)
+    end
 end
